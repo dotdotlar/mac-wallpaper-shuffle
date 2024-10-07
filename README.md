@@ -6,7 +6,7 @@ Shuffle your desktop wallpaper from a directory of image files (jpg, png)
 ## Description
 This is a bash script that leverages an macOS Automator workflow that changes the desktop wallpaper to whatever image file (jpg, heic or png) is passed in.
 
-The script does some parameter validation, then unpacks the uuencoded workflow into /tmp.  It then loops over the randomized list of files from the target (if specified) or current directory, sleeping for the specified (or 1 hour if not specified) before moving to the next image.
+The script does some parameter validation, then unpacks the uuencoded Automator workflow into /tmp.  It then loops over the randomized list of files from the target (if specified) or current directory, calls the Automator workflow for the given file, then sleeps for the specified delay (or 1 hour if not specified) before repeating the process for the next image file in the list.
 
 The script will run forever, so in the current iteration, if you background the job, you'll have to kill it to stop.
 
