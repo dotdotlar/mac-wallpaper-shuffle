@@ -1059,7 +1059,7 @@ while [ 1 = 1 ]; do
     #   spaces in their names by changing spaces in filenames
     #   to backticks)
     #
-    for file in $(\ls -1 | egrep "([Jj][Pp][Gg]|[Hh][Ee][Ii][Cc]|[Pp][Nn][Gg])" | sort -R | sed 's/\.\([Jj][Pp][Gg]\) /.\1,/g' | sed 's/\.\([Pp][Nn][Gg]\) /.\1,/g' | sed 's/ /`/g' | sed 's/,/ /g'); do
+    for file in $(\ls -1 | egrep "([Jj][Pp][Ee]*[Gg]|[Hh][Ee][Ii][Cc]|[Pp][Nn][Gg])" | sort -R | sed 's/\.\([Jj][Pp][Ee]*[Gg]\) /.\1,/g' | sed 's/\.\([Pp][Nn][Gg]\) /.\1,/g' | sed 's/ /`/g' | sed 's/,/ /g'); do
         #
         #  Change the back-ticks back to spaces
         #
