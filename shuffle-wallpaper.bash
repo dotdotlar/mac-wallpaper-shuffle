@@ -18,14 +18,16 @@ delaysecs=3600
 # begin function defs
 ####################################################################
 
+#########################################################
 #
 #  usage()
 #
 usage() {
-    echo -e "usage: $0 [-d <delay>[hms]] [<image-dir>]\n\n  Examples:\n    $0 -d 4 \$HOME/Photos    # switch every 4 hours\n    $0 -d 2h .              # switch every 2 hours\n    $0 -d 30m /tmp/imagedir # switch every 30 mins\n    $0 -d 45s ~/Pictures    # switch every 45 secs\n\n  Default switch time is 1 hour and default time unit is hours"
+    echo -e "usage: $0 [-1] [-d <delay>[hms]] [<image-dir>]\n\n  Examples:\n    $0 -1                   # run once on current dir and exit\n    $0 -d 4h \$HOME/Photos   # switch every 4 hours\n    $0 -d 2h .              # switch every 2 hours\n    $0 -d 30m /tmp/imagedir # switch every 30 mins\n    $0 -d 45s ~/Pictures    # switch every 45 secs\n\n  Default switch time is 1 hour and default time unit is hours"
     exit 0
 }
 
+#########################################################
 #
 #  setdelay()
 #
@@ -39,28 +41,28 @@ setdelay() {
     #
     pstr="$1"
 
-    if [[ "$pstr" =~ ^[0-9]0-9]*$ ]]; then
-
+    if [[ "$pstr" =~ ^[0-9][0-9]*$ ]]; then
+        # if no unit specified, assume hours
+        echo "No time unit specified; assuming hours"
         delaysecs=$(($pstr * 3600))
 
     elif [[ "$pstr" =~ ^[0-9][0-9]*[hms]$ ]]; then
 
         # process units first
         unitchar="${pstr:0-1}"
-#        pval="${pstr::-1}"
         pval="${pstr:0:${#pstr}-1}"
 
         case $unitchar in
-            h)
+            h)  # delay in hours
                 delaysecs=$(($pval * 3600))
                 ;;
-            m)
+            m)  # delay in minutes
                 delaysecs=$(($pval * 60))
                 ;;
-            s)
+            s)  # delay in seconds
                 delaysecs=$pval
                 ;;
-            *)
+            *)  # code shouldn't get here.  But just in case...
                 echo "ERROR: Unknown time unit [$unitchar] in param [$pstr]"
                 echo "ERROR: Cannot continue."
                 exit 1
@@ -73,6 +75,19 @@ setdelay() {
         exit 1
     fi
 }
+#########################################################
+#
+# getotherpid()
+#
+# Returns the PID value of another running shuffle-wallpaper process by
+# setting global variable "otherpid"
+#
+getotherpid() {
+    otherpid=""
+    otherpid=$(ps -ef | grep "$0" | grep -v "$$" | grep -v grep | awk '{print $2}')
+    return
+}
+#########################################################
 #
 #  setwallpaper()
 #
@@ -87,10 +102,13 @@ setwallpaper() {
     return
 }
 
+#########################################################
 #
 #  unpackworkflow()
-#  Take the uuencoded data embedded within, create a tarball
-#  in /tmp and then extract the workflow from the tarball
+#
+#  Create a TGZ file in /tmp from the uuencoded data
+#  embedded within, then extract the macOS Automator
+#  workflow from the tarball
 #
 unpackworkflow() {
     local cdir="$(pwd)"
@@ -934,14 +952,19 @@ cleanupworkflow() {
 # main()
 ####################################################################
 
+runonce=FALSE
+
 #
 #  Process switch parameters
 #
-while getopts "hHd:" o; do
+while getopts "1hHd:" o; do
     case "${o}" in
         h|H)
             usage
             exit 0
+            ;;
+        1)
+            runonce=TRUE
             ;;
         d)
             if [[ "$OPTARG" =~ ^[0-9][0-9]*$ || "$OPTARG" =~ ^[0-9][0-9]*[hms]$ ]]; then
@@ -957,6 +980,42 @@ while getopts "hHd:" o; do
             ;;
     esac
 done
+
+#
+#  See if shuffle wallpaper is already running.  If it is, kill it so that
+#  the new parameters are used going forward.
+#
+mypid=$$
+
+getotherpid
+
+if [ ! -z "$otherpid" ]; then
+    echo "Shuffle wallpaper is already running in the background (pid=$otherpid).  Replacing."
+
+    kill $otherpid
+
+    rc=$?
+    getotherpid
+
+    if [ "$?" = "1" ] || [ ! -z "$otherpid" ]; then
+        echo "Unable to stop existing background process.  Exiting."
+        exit 1
+    fi
+fi
+
+#
+#  Unless user only wants one run, automatically background the process,
+#  but only fork/exec the script once
+#
+if [ "$runonce" = "FALSE" ]; then
+    echo "Will loop every $delaysecs seconds"
+    if [ -z $SWBACKGROUND ]; then
+        SWBACKGROUND=TRUE nohup "$0" $* > /dev/null 2>&1 &
+        exit 0
+    fi
+else
+    echo "Running once."
+fi
 
 #
 #  Shift off the switch parameters, leaving the positional args
@@ -1012,11 +1071,23 @@ while [ 1 = 1 ]; do
         setwallpaper "$ffile"
 
         #
+        #  Break out of this is a 'run once' scenario
+        #
+        if [ "$runonce" = "TRUE" ]; then
+            break;
+        fi
+
+        #
         #  Sleep however long was specified, or the default
         #
         sleep $delaysecs
 
     done
+
+    if [ "$runonce" = "TRUE" ]; then
+        break;
+    fi
+
 done
 
 exit 0
